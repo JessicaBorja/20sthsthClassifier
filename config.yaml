@@ -1,0 +1,10 @@
+#---- config ----#
+optimizer:
+  lr: 1e-5
+  type: adam
+
+#-- Hydra config --#
+hydra:
+  run:
+    # Output directory for normal runs
+    dir: ./outputs/${now:%Y-%m-%d_%H-%M-%S}
