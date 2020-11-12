@@ -17,7 +17,7 @@ class SthSthDataset(Dataset):
     """20something-something dataset."""
     "id, label, template(Masked words), placeholders(words labels)"
 
-    def __init__(self, labels_dir, data_dir, labels_file = "something-something-v2-train.json",\
+    def __init__(self, base_dir, labels_file = "something-something-v2-train.json",\
                     str2id_file = "something-something-v2-labels.json", n_frames= 10, transform=None):
         """
         Args:
@@ -26,12 +26,12 @@ class SthSthDataset(Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
-        self.labels_frame = pd.read_json(os.path.join(labels_dir, labels_file))
+        self.labels_dir = "%s/labels/"%base_dir
+        self.data_dir = "%s/data/"%base_dir
+        self.labels_frame = pd.read_json(os.path.join(self.labels_dir, labels_file))
         self.labels_id_frame = pd.read_json(\
-                                os.path.join( labels_dir, str2id_file),\
+                                os.path.join(self.labels_dir, str2id_file),\
                                 typ='series')
-        self.labels_dir = labels_dir
-        self.data_dir = data_dir
         self.transform = transform
         self.n_frames = n_frames if n_frames<=20 else 20
         self.transform = transform

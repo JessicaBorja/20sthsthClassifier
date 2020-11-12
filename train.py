@@ -7,16 +7,13 @@ from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.transforms import Grayscale
 from classifier import ResNet18LSTM
-import pandas as pd
 import hydra
 import logging
 from omegaconf import DictConfig, OmegaConf
-import os
-import cv2
+import os, yaml
 import numpy as np 
 from datasets import SthSthDataset
-import datetime
-import time
+import datetime, time
 # @hydra.main(config_name="config")
 # def main_hydra(cfg : DictConfig) -> None:
 #     print(OmegaConf.to_yaml(cfg))
@@ -61,17 +58,16 @@ def train(loader, model, criterion, optimizer):
             print('[mb %5d/%d] mean loss: %.3f, mean accuracy: %.3f' %
                   (i + 1, n_minibatches, mean_train_loss, correct / total))
     mean_train_accuracy = correct / total
-    print('mean train acc: %.3f' % (mean_train_accuracy))
     return mean_train_loss, mean_train_accuracy
 
-def validate(val_loader, model, criterion):
-    print("validation...")
+def validate(loader, model, criterion):
+    n_minibatches = len(loader)
     correct = 0
     total = 0
     mean_val_loss = 0
     model.eval()
     with torch.no_grad():
-        for i, data in enumerate(val_loader, 0):
+        for i, data in enumerate(loader, 0):
             images, labels = data
             #cuda
             images = images.cuda()
@@ -84,52 +80,38 @@ def validate(val_loader, model, criterion):
             #mean loss
             loss = criterion(outputs, labels)
             mean_val_loss += (1/(i+1))*(loss.item() - mean_val_loss)
-
+            if i % 200 == 0:    # print every 100 mini-batches
+                print('[mb %5d/%d] mean loss: %.3f, mean accuracy: %.3f' %
+                  (i + 1, n_minibatches, mean_val_loss, correct / total))
     mean_val_accuracy = correct / total
-    print('Accuracy of the network on the val images: %.3f' % (
-        mean_val_accuracy))
     return mean_val_loss, mean_val_accuracy
 
 @hydra.main(config_name="config")
 def main(cfg : DictConfig) -> None:
 #def main():
     logger = logging.getLogger(__name__)
-    models_folder = cfg.models_folder #"./trained_models/"
-    base_dir = cfg.base_dir
     reshape_transform = transforms.Compose([transforms.ToPILImage(),
                                     transforms.Resize((64, 64)),
                                     #transforms.Grayscale(),
                                     transforms.ToTensor()])
-    train_data = SthSthDataset(labels_dir = "%s/labels/"%base_dir,
-                               data_dir ="%s/data/"%base_dir,
-                               labels_file = cfg.train_filename, #"something-something-v2-train_new.json",
-                               str2id_file = cfg.str2id_file,
-                               n_frames = cfg.n_frames,
-                               transform = reshape_transform)
-    val_data = SthSthDataset(labels_dir = "%s/labels/"%base_dir,
-                               data_dir ="%s/data/"%base_dir,
-                               labels_file = cfg.validation_filename,
-                               str2id_file = cfg.str2id_file,
-                               n_frames = cfg.n_frames,
-                               transform = reshape_transform)
-    train_loader = torch.utils.data.DataLoader(train_data,
-                                                batch_size = cfg.batch_size, shuffle=True,
-                                                num_workers = cfg.num_workers)
-    val_loader = torch.utils.data.DataLoader(val_data,
-                                                batch_size = cfg.batch_size, shuffle=True,
-                                                num_workers = cfg.num_workers)
+    train_data = SthSthDataset(labels_file = cfg.train_filename, #"something-something-v2-train_new.json",
+                               transform = reshape_transform,
+                               **cfg.dataset)
+    val_data = SthSthDataset(labels_file = cfg.validation_filename,
+                             transform = reshape_transform,
+                             **cfg.dataset)
+    train_loader = torch.utils.data.DataLoader(train_data, **cfg.dataloader)
+    val_loader = torch.utils.data.DataLoader(val_data, **cfg.dataloader)
     #n_classes = train_data.calc_n_classes()
     #Original number of classes: 174, new:78
-    model = ResNet18LSTM(pretrained=cfg.pretrained, n_classes = 78, save_dir="./trained_models").cuda()
+    model = ResNet18LSTM(**cfg.model).cuda()
     #print(model)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=cfg.optim.lr, weight_decay=cfg.optim.weight_decay) #cfg.lr
+    optimizer = torch.optim.Adam(model.parameters(), **cfg.optim) #cfg.lr
 
     logger.info('train_data {}'.format(train_data.__len__()))
     logger.info('val_data {}'.format(val_data.__len__()))
-    #print('train_data {}'.format(train_data.__len__()))
-    #print('val_data {}'.format(val_data.__len__()))
 
     # best_val_loss, best_train_loss = np.inf, np.inf
     # best_val_acc, best_train_acc = -np.inf, -np.inf
@@ -145,21 +127,26 @@ def main(cfg : DictConfig) -> None:
         start_time = time.time()
         print("Epoch {}".format(epoch))
         train_loss, train_accuracy = train(train_loader, model, criterion, optimizer)
+        logger.info('[Epoch %d] mean train acc: %.3f' % (epoch, train_accuracy))
+
         val_loss, val_acc = validate(val_loader, model, criterion)
+        logger.info('[Epoch %d] mean validation acc: %.3f' % (epoch, val_acc))
+
         results_dict = {"Loss/train" : train_loss, "Loss/validation": val_loss,
                     "Accuracy/train" : train_accuracy, "Accuracy/validation": val_acc}
         for key,value in results_dict.items():
             writer.add_scalar(key, value, epoch)
 
         #save all models
-        model.save("epoch_"+str(epoch)+".pth")
+        save(epoch, model, optimizer, cfg.models_folder ,"epoch_"+str(epoch))
         end_time = time.time()
         seconds = end_time - start_time
-        print("Elapsed seconds:%0.3f, Time: %s"%(seconds, str(datetime.timedelta(seconds=seconds))))
+        
+        logger.info("Elapsed seconds:%0.3f, Time: %s"%(seconds, str(datetime.timedelta(seconds=seconds))))
 
 def save(epoch, model, optim, folder, name):
     save_dict = {"model_state_dict": model.state_dict(),
-                "optimizer_state_dict": optim.sate_dict(),
+                "optimizer_state_dict": optim.state_dict(),
                 "epoch": epoch}
     filename = os.path.join(folder, name+".pth")
     torch.save(save_dict, filename)
@@ -177,6 +164,18 @@ def load(path, model, optimizer, train=True):
     
     return epoch
 
+
+def test_load():
+    hydra_folder = "./outputs/2020-11-12/21-27-20"
+    cfg  = yaml.load(open( "%s/.hydra/config.yaml"%hydra_folder, 'r'))
+    cfg["model"]["save_dir"] = cfg["models_folder"]
+    model = ResNet18LSTM(**cfg["model"]).cuda()
+    optimizer = torch.optim.SGD(model.parameters(), **cfg["optim"]) #cfg.lr
+    models_path = "%s/trained_models/epoch_11.pth"%hydra_folder
+    epoch = load(models_path, model, optimizer, train=True)
+    print(epoch)
+
+
 if __name__ == "__main__":
-    #test_load()
+    test_load()
     main()

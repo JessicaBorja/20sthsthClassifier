@@ -1,23 +1,33 @@
 #---- config ----#
-base_dir: "C://Users//Jessica//Documents//Proyecto_ssd//Classifier//datasets//20bn-sth-sth-v2"
+data_base_dir: "C://Users//Jessica//Documents//Proyecto_ssd//Classifier//datasets//20bn-sth-sth-v2"
 train_filename: "78-classes_train.json"
 validation_filename: "78-classes_validation.json"
-str2id_file: "78-classes_labels.json"
 models_folder: "./trained_models/"
 exp_name : "20sth_sth_v2"
 
 n_epochs: 30
 #data loader
-num_workers: 2
-pretrained: True
-batch_size : 4
-n_frames : 8 #frames to pick from each video
+dataset:
+  base_dir: ${data_base_dir}
+  n_frames : 8 #frames to pick from each video
+  str2id_file: "78-classes_labels.json"
 
+dataloader:
+  num_workers: 2
+  batch_size : 4
+  shuffle: True
 #Network
 optim:
   lr: 1e-4
   weight_decay: 1e-4
 
+model:
+  save_dir: ${models_folder}
+  backbone : "resnet18"
+  pretrained: True
+  n_classes: 78
+  rnn_hidden: 256
+  num_layers: 4
 #-- Hydra config --#
 # hydra:
 #   run:

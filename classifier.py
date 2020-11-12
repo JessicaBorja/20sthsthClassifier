@@ -8,10 +8,12 @@ from torchvision.models.resnet import resnet18, resnet50, resnet101, resnet152
 import os
 
 class ResNet18LSTM(nn.Module):
-    def __init__(self, pretrained, n_classes, rnn_hidden = 256, num_layers = 4, save_dir = "./trained_models/"):
+    def __init__(self, pretrained, n_classes, rnn_hidden = 256, num_layers = 4, \
+                 backbone= "resnet18", save_dir = "./trained_models/"):
         super().__init__()
+        self.save_dir = save_dir
         self.pretrained = pretrained
-        self.resnet = IntermediateLayerGetter(resnet18(pretrained=pretrained), {"avgpool": "out"}).cuda()
+        self.backbone_net = IntermediateLayerGetter(self.get_backbone(backbone, pretrained=pretrained), {"avgpool": "out"}).cuda()
         self.fc1 = nn.Linear(512,512)
         self.lstm =  nn.LSTM(
                         input_size = 512,
@@ -28,15 +30,27 @@ class ResNet18LSTM(nn.Module):
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
+    def get_backbone(self, name, pretrained):
+        if name == "resnet18":
+            return resnet18(pretrained=pretrained)
+        elif name == "resnet50":
+            return resnet50(pretrained=pretrained)
+        elif name == "resnet101":
+            return resnet101(pretrained=pretrained)
+        elif name == "resnet152":
+            return resnet152(pretrained=pretrained)
+        else:
+            return resnet18(pretrained=pretrained) #default
+
     def forward(self, x_in): #(batch, n_frames, channels, w, h)
         cnn_feat_seq = []
         for t in range(x_in.size(1)):
             # Pass each frame through resnet 
             if(self.pretrained):
                 with torch.no_grad():
-                    x = self.resnet(x_in[:, t, :, :, :])['out']  # image t = (batch, channels, w, h)
+                    x = self.backbone_net(x_in[:, t, :, :, :])['out']  # image t = (batch, channels, w, h)
             else:
-                x = self.resnet(x_in[:, t, :, :, :])['out']  # image t = (batch, channels, w, h)
+                x = self.backbone_net(x_in[:, t, :, :, :])['out']  # image t = (batch, channels, w, h)
             x = x.view(x.size(0), -1) # (batch, channels * w * h)
             # FC layers
             x = F.relu(self.fc1(x))
