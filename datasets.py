@@ -16,7 +16,8 @@ class SthSthDataset(Dataset):
     """20something-something dataset."""
     "id, label, template(Masked words), placeholders(words labels)"
 
-    def __init__(self, labels_dir, data_dir, labels_file = "something-something-v2-train.json",skip_frames= 4, transform=None):
+    def __init__(self, labels_dir, data_dir, labels_file = "something-something-v2-train.json",\
+                    n_frames= 10, transform=None):
         """
         Args:
             csv_file (string): Path to the csv file with annotations.
@@ -31,7 +32,25 @@ class SthSthDataset(Dataset):
         self.labels_dir = labels_dir
         self.data_dir = data_dir
         self.transform = transform
-        self.skip_frames = skip_frames
+        self.n_frames = n_frames if n_frames<=20 else 20
+        self.transform = transform
+        self.new_ids = self.map_large2small()
+
+    def calc_n_classes(self):
+        return len(self.labels_frame["template"].unique())
+
+    def map_large2small(self):
+        keep_ids = [5,6] + list(range(8,25)) + [27,29] +\
+            list(range(40,48)) + [49] +  list(range(53,59)) +\
+            [60,62,69,83] + list(range(85,90)) + list(range(93,97))+\
+            list(range(98,102)) + list(range(104,111))+\
+            [118,121,122,123,129,130,148,151,152] +\
+            list(range(155,161)) + [164,170,171,172,173]
+        keep_ids.remove(159)
+        keep_ids.remove(108)
+        new_ids_lst = list(range(len(keep_ids)))
+        old2new = dict(zip(keep_ids, new_ids_lst))
+        return old2new
 
     def __len__(self):
         return len(self.labels_frame)
@@ -50,15 +69,20 @@ class SthSthDataset(Dataset):
             ret, frame =  cap.read()
             if ret == False:
                 break
-            if(c % self.skip_frames == 0):
-                video_frames.append(frame)
+            video_frames.append(frame)
             c+=1
         cap.release()
         cv2.destroyAllWindows()
+        selected_indices = np.round(np.linspace(0, len(video_frames) - 1, self.n_frames)).astype(int)
+        
+        if self.transform:
+            video_frames = [self.transform(video_frames[i]) for i in selected_indices]
+        else:
+            video_frames = [video_frames[i] for i in selected_indices]
         video_frames = np.stack(video_frames,axis=0)
         
         #return labels
         label = curr_video["template"].replace("[", "").replace("]", "")
         label_id = self.labels_id_frame[label]
-        
+        label_id = self.new_ids[label_id]
         return video_frames, label_id

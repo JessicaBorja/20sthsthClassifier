@@ -1,6 +1,15 @@
 #---- config ----#
+batch_size : 4 
+n_frames : 8 #frames to pick from each video
+data_dir_basename: "./datasets/20bn-something-something-v2"
+train_filename: "something-something-v2-train_new.json"
+validation_filename: "something-something-v2-validation_new.json"
+models_folder: "./trained_models/"
+log_tensorboard: True
+
 optimizer:
   lr: 1e-5
+  weight_decay: 1e-4
   type: adam
 
 #-- Hydra config --#
