@@ -89,6 +89,7 @@ def validate(loader, model, criterion):
 @hydra.main(config_name="config")
 def main(cfg : DictConfig) -> None:
 #def main():
+    print("Running configuration: ", cfg)
     logger = logging.getLogger(__name__)
     reshape_transform = transforms.Compose([transforms.ToPILImage(),
                                     transforms.Resize((64, 64)),
@@ -177,5 +178,5 @@ def test_load():
 
 
 if __name__ == "__main__":
-    test_load()
+    #test_load()
     main()

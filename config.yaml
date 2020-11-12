@@ -3,7 +3,7 @@ data_base_dir: "C://Users//Jessica//Documents//Proyecto_ssd//Classifier//dataset
 train_filename: "78-classes_train.json"
 validation_filename: "78-classes_validation.json"
 models_folder: "./trained_models/"
-exp_name : "20sth_sth_v2"
+exp_name : "20sth_sth_v2" #summary writer name, code appends date and time
 
 n_epochs: 30
 #data loader
