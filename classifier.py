@@ -4,11 +4,11 @@ import torch.nn.functional as F
 from torch.nn.modules import rnn
 from torchvision.models._utils import IntermediateLayerGetter
 from torchvision.models.segmentation.deeplabv3 import DeepLabHead
-from torchvision.models.resnet import resnet18
-
+from torchvision.models.resnet import resnet18, resnet50, resnet101, resnet152
+import os
 
 class ResNet18LSTM(nn.Module):
-    def __init__(self, pretrained, n_classes, rnn_hidden = 256, num_layers = 4):
+    def __init__(self, pretrained, n_classes, rnn_hidden = 256, num_layers = 4, save_dir = "./trained_models/"):
         super().__init__()
         self.pretrained = pretrained
         self.resnet = IntermediateLayerGetter(resnet18(pretrained=pretrained), {"avgpool": "out"}).cuda()
@@ -25,6 +25,8 @@ class ResNet18LSTM(nn.Module):
         #self.softmax = nn.Softmax(dim = -1)
         #nn.init.xavier_uniform_(self.fc1.weight)
         #nn.init.xavier_uniform_(self.fc2.weight)
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
 
     def forward(self, x_in): #(batch, n_frames, channels, w, h)
         cnn_feat_seq = []
@@ -49,7 +51,13 @@ class ResNet18LSTM(nn.Module):
         del cnn_feat_seq
         # h_n shape = h_c shape = (n_layers, batch, hidden_size) 
         x = F.relu(self.fc2(rnn_out[:, -1, :]))# (batch,128) choose rnn_out at the last time step
-        x = self.fc3(x) # (batch,1,n_classes) softmax in last dimension
+        x = self.fc3(x) # (batch,1,n_classes)
         #x = F.dropout(x, p=0.2, training=self.training)
         return x
 
+    def save(self, model_name = "model"):
+        filename = os.path.join(self.save_dir, model_name+".pth")
+        torch.save(self.state_dict(), filename )
+
+    def load(self, filepath):
+        self.load_state_dict(torch.load(filepath))

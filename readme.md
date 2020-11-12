@@ -6,3 +6,4 @@
     - Cv2
     - PIL
     - Hydra
+    - fsspec

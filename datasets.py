@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 import cv2
+import os
 # # Ignore warnings
 # import warnings
 # warnings.filterwarnings("ignore")
@@ -17,7 +18,7 @@ class SthSthDataset(Dataset):
     "id, label, template(Masked words), placeholders(words labels)"
 
     def __init__(self, labels_dir, data_dir, labels_file = "something-something-v2-train.json",\
-                    n_frames= 10, transform=None):
+                    str2id_file = "something-something-v2-labels.json", n_frames= 10, transform=None):
         """
         Args:
             csv_file (string): Path to the csv file with annotations.
@@ -25,9 +26,9 @@ class SthSthDataset(Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
-        self.labels_frame = pd.read_json( os.path.join(labels_dir, labels_file) )
+        self.labels_frame = pd.read_json(os.path.join(labels_dir, labels_file))
         self.labels_id_frame = pd.read_json(\
-                                os.path.join( labels_dir,"something-something-v2-labels.json"),\
+                                os.path.join( labels_dir, str2id_file),\
                                 typ='series')
         self.labels_dir = labels_dir
         self.data_dir = data_dir

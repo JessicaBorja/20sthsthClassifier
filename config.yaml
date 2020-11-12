@@ -1,19 +1,25 @@
 #---- config ----#
-batch_size : 4 
-n_frames : 8 #frames to pick from each video
-data_dir_basename: "./datasets/20bn-something-something-v2"
-train_filename: "something-something-v2-train_new.json"
-validation_filename: "something-something-v2-validation_new.json"
+base_dir: "C://Users//Jessica//Documents//Proyecto_ssd//Classifier//datasets//20bn-sth-sth-v2"
+train_filename: "78-classes_train.json"
+validation_filename: "78-classes_validation.json"
+str2id_file: "78-classes_labels.json"
 models_folder: "./trained_models/"
-log_tensorboard: True
+exp_name : "20sth_sth_v2"
 
-optimizer:
-  lr: 1e-5
+n_epochs: 30
+#data loader
+num_workers: 2
+pretrained: True
+batch_size : 4
+n_frames : 8 #frames to pick from each video
+
+#Network
+optim:
+  lr: 1e-4
   weight_decay: 1e-4
-  type: adam
 
 #-- Hydra config --#
-hydra:
-  run:
-    # Output directory for normal runs
-    dir: ./outputs/${now:%Y-%m-%d_%H-%M-%S}
+# hydra:
+#   run:
+#     # Output directory for normal runs
+#     dir: ./outputs/${now:%Y-%m-%d_%H-%M-%S}
