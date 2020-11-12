@@ -157,6 +157,26 @@ def main(cfg : DictConfig) -> None:
         seconds = end_time - start_time
         print("Elapsed seconds:%0.3f, Time: %s"%(seconds, str(datetime.timedelta(seconds=seconds))))
 
+def save(epoch, model, optim, folder, name):
+    save_dict = {"model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optim.sate_dict(),
+                "epoch": epoch}
+    filename = os.path.join(folder, name+".pth")
+    torch.save(save_dict, filename)
+
+def load(path, model, optimizer, train=True):
+    checkpoint = torch.load(path)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    epoch = checkpoint['epoch']
+
+    if(train):
+        model.train()
+    else:
+        model.eval()
+    
+    return epoch
+
 if __name__ == "__main__":
     #test_load()
     main()
