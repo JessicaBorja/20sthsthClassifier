@@ -91,6 +91,7 @@ def main(cfg : DictConfig) -> None:
 #def main():
     print("Running configuration: ", cfg)
     logger = logging.getLogger(__name__)
+    logger.info("Running configuration: %s", cfg)
     reshape_transform = transforms.Compose([transforms.ToPILImage(),
                                     transforms.Resize((cfg.img_size, cfg.img_size)),
                                     #transforms.Grayscale(),
@@ -114,8 +115,8 @@ def main(cfg : DictConfig) -> None:
     logger.info('train_data {}'.format(train_data.__len__()))
     logger.info('val_data {}'.format(val_data.__len__()))
 
-    # best_val_loss, best_train_loss = np.inf, np.inf
-    # best_val_acc, best_train_acc = -np.inf, -np.inf
+    best_val_loss, best_train_loss = np.inf, np.inf
+    best_val_acc, best_train_acc = -np.inf, -np.inf
     model_name = cfg.exp_name#
     model_name = "{}_{}".format(model_name, datetime.datetime.now().strftime('%d-%m_%I-%M'))
     
@@ -127,23 +128,50 @@ def main(cfg : DictConfig) -> None:
     for epoch in range(cfg.n_epochs):
         start_time = time.time()
         print("Epoch {}".format(epoch))
-        train_loss, train_accuracy = train(train_loader, model, criterion, optimizer)
-        logger.info('[Epoch %d] mean train acc: %.3f' % (epoch, train_accuracy))
+        train_loss, train_acc = train(train_loader, model, criterion, optimizer)
+        logger.info('[Epoch %d] mean train acc: %.3f' % (epoch, train_acc))
 
         val_loss, val_acc = validate(val_loader, model, criterion)
         logger.info('[Epoch %d] mean validation acc: %.3f' % (epoch, val_acc))
 
         results_dict = {"Loss/train" : train_loss, "Loss/validation": val_loss,
-                    "Accuracy/train" : train_accuracy, "Accuracy/validation": val_acc}
+                    "Accuracy/train" : train_acc, "Accuracy/validation": val_acc}
         for key,value in results_dict.items():
             writer.add_scalar(key, value, epoch)
 
-        #save all models
-        save(epoch, model, optimizer, cfg.models_folder ,"epoch_"+str(epoch))
+        
+        #save(epoch, model, optimizer, cfg.models_folder ,"epoch_"+str(epoch)) #save all models
+        best_train_loss, best_val_loss, best_train_acc, best_val_acc = \
+            save_only_best(epoch, model, optimizer, cfg.models_folder, logger, \
+                        train_loss, best_train_loss, val_loss, best_val_loss,\
+                        train_acc, best_train_acc, val_acc, best_val_acc)
+
         end_time = time.time()
         seconds = end_time - start_time
         
         logger.info("Elapsed seconds:%0.3f, Time: %s"%(seconds, str(datetime.timedelta(seconds=seconds))))
+
+def save_only_best(epoch, model, optimizer, models_folder, logger,\
+                    train_loss, best_train_loss, val_loss, best_val_loss,\
+                    train_acc, best_train_acc, val_acc, best_val_acc):
+    if(train_loss<best_train_loss):
+        logger.info('[Epoch %d] saving best train loss model: %.3f' % (epoch, train_loss))
+        save(epoch, model, optimizer, models_folder ,"best_train_loss")
+        best_train_loss = train_loss
+    if(val_loss<best_val_loss):
+        logger.info('[Epoch %d] saving best validation loss model: %.3f' % (epoch, val_loss))
+        save(epoch, model, optimizer, models_folder ,"best_val_loss")
+        best_val_loss = val_loss
+    #Best accuracy
+    if(train_acc>best_train_acc):
+        logger.info('[Epoch %d] saving best train accuracy model: %.3f' % (epoch, train_acc))
+        save(epoch, model, optimizer, models_folder ,"best_train_acc")
+        best_train_acc = train_acc
+    if(val_acc>best_val_acc):
+        logger.info('[Epoch %d] saving best validation accuracy model: %.3f' % (epoch, val_acc))
+        save(epoch, model, optimizer, models_folder ,"best_val_acc")
+        best_val_acc = val_acc
+    return best_train_loss, best_val_loss, best_train_acc, best_val_acc
 
 def save(epoch, model, optim, folder, name):
     save_dict = {"model_state_dict": model.state_dict(),
@@ -165,18 +193,41 @@ def load(path, model, optimizer, train=True):
     
     return epoch
 
-
-def test_load():
-    hydra_folder = "./outputs/2020-11-12/21-27-20"
+def resume_training(hydra_folder, model_name):
     cfg  = yaml.load(open( "%s/.hydra/config.yaml"%hydra_folder, 'r'))
     cfg["model"]["save_dir"] = cfg["models_folder"]
     model = ResNet18LSTM(**cfg["model"]).cuda()
     optimizer = torch.optim.SGD(model.parameters(), **cfg["optim"]) #cfg.lr
-    models_path = "%s/trained_models/epoch_11.pth"%hydra_folder
+    models_path = "%s/trained_models/%s"%(hydra_folder, model_name)
     epoch = load(models_path, model, optimizer, train=True)
-    print(epoch)
+    return model, optimizer, epoch
+
+def eval_model(hydra_folder, model_name):
+    #Setup
+    cfg  = yaml.load(open( "%s/.hydra/config.yaml"%hydra_folder, 'r'))
+    cfg["model"]["save_dir"] = cfg["models_folder"]
+    model = ResNet18LSTM(**cfg["model"]).cuda()
+    optimizer = torch.optim.SGD(model.parameters(), **cfg["optim"]) #cfg.lr
+    models_path = "%s/trained_models/%s"%(hydra_folder, model_name)
+    epoch = load(models_path, model, optimizer, train=False)
+    criterion = nn.CrossEntropyLoss()
+    reshape_transform = transforms.Compose([transforms.ToPILImage(),
+                                    transforms.Resize((64, 64)),
+                                    #transforms.Grayscale(),
+                                    transforms.ToTensor()])
+    val_data = SthSthDataset(labels_file = "78-classes_validation.json",
+                             transform = reshape_transform,
+                             base_dir = "./datasets/20bn-sth-sth-v2",
+                             n_frames = 8, #frames to pick from each video
+                             str2id_file= "78-classes_labels.json"
+                             )
+    val_loader = torch.utils.data.DataLoader(val_data, num_workers = 2, batch_size=4 ,shuffle=True)
+
+    val_loss, val_acc = validate(val_loader, model, criterion)
+    print(epoch, val_loss, val_acc)
 
 
 if __name__ == "__main__":
-    #test_load()
+    # hydra_folder = "./outputs/2020-11-13/01-17-46"
+    # eval_model(hydra_folder, model_name="epoch_18.pth")
     main()
