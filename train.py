@@ -92,7 +92,7 @@ def main(cfg : DictConfig) -> None:
     print("Running configuration: ", cfg)
     logger = logging.getLogger(__name__)
     reshape_transform = transforms.Compose([transforms.ToPILImage(),
-                                    transforms.Resize((64, 64)),
+                                    transforms.Resize((cfg.img_size, cfg.img_size)),
                                     #transforms.Grayscale(),
                                     transforms.ToTensor()])
     train_data = SthSthDataset(labels_file = cfg.train_filename, #"something-something-v2-train_new.json",

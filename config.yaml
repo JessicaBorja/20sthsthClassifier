@@ -4,7 +4,7 @@ train_filename: "78-classes_train.json"
 validation_filename: "78-classes_validation.json"
 models_folder: "./trained_models/"
 exp_name : "20sth_sth_v2" #summary writer name, code appends date and time
-
+img_size: 64
 n_epochs: 30
 #data loader
 dataset:
@@ -23,7 +23,7 @@ optim:
 
 model:
   save_dir: ${models_folder}
-  backbone : "resnet18"
+  backbone : "resnet152" #18,50,101,152
   pretrained: True
   n_classes: 78
   rnn_hidden: 256
