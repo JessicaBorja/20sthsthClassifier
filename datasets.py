@@ -87,3 +87,54 @@ class SthSthDataset(Dataset):
         label_id = self.labels_id_frame[label]
         label_id = self.new_ids[label_id]
         return video_frames, label_id
+
+class SthSthTestset(Dataset):
+    """20something-something dataset."""
+    "id, label, template(Masked words), placeholders(words labels)"
+
+    def __init__(self, base_dir, ids_file = "something-something-v2-test.json",\
+                 n_frames= 10, transform=None):
+        """
+        Args:
+            csv_file (string): Path to the csv file with annotations.
+            root_dir (string): Directory with all the videos.
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+        """
+        self.labels_dir = "%s/labels/"%base_dir
+        self.data_dir = "%s/data/"%base_dir
+        self.video_ids_frame = pd.read_json(os.path.join(self.labels_dir, ids_file))
+        self.transform = transform
+        self.n_frames = n_frames if n_frames<=20 else 20
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.video_ids_frame)
+
+    def __getitem__(self, idx):
+        curr_video = self.video_ids_frame.iloc[idx]
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+        video_name = os.path.join(self.data_dir,
+                                  str(curr_video["id"])) + ".webm"
+
+        cap = cv2.VideoCapture(video_name)
+        video_frames = []
+        c = 0
+        while(cap.isOpened() and c<50): #to avoid loop for ever
+            ret, frame =  cap.read()
+            if ret == False:
+                break
+            video_frames.append(frame)
+            c+=1
+        cap.release()
+        cv2.destroyAllWindows()
+        selected_indices = np.round(np.linspace(0, len(video_frames) - 1, self.n_frames)).astype(int)
+        
+        if self.transform:
+            video_frames = [self.transform(video_frames[i]) for i in selected_indices]
+        else:
+            video_frames = [video_frames[i] for i in selected_indices]
+        video_frames = np.stack(video_frames,axis=0)
+        
+        return video_frames, video_name

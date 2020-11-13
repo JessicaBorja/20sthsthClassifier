@@ -14,14 +14,7 @@ import os, yaml
 import numpy as np 
 from datasets import SthSthDataset
 import datetime, time
-# @hydra.main(config_name="config")
-# def main_hydra(cfg : DictConfig) -> None:
-#     print(OmegaConf.to_yaml(cfg))
-#     log = logging.getLogger(__name__)
-#     log.info("Info level message")
-#     log.debug("Debug level message")
-#     model = models.resnet18()
-#     model1 = ResNet18Backbone(pretrained = False)
+from utils.utils import load, save, resume_training
 
 def train(loader, model, criterion, optimizer):
     n_minibatches = len(loader)
@@ -88,7 +81,6 @@ def validate(loader, model, criterion):
 
 @hydra.main(config_name="config")
 def main(cfg : DictConfig) -> None:
-#def main():
     print("Running configuration: ", cfg)
     logger = logging.getLogger(__name__)
     logger.info("Running configuration: %s", cfg)
@@ -139,7 +131,6 @@ def main(cfg : DictConfig) -> None:
         for key,value in results_dict.items():
             writer.add_scalar(key, value, epoch)
 
-        
         #save(epoch, model, optimizer, cfg.models_folder ,"epoch_"+str(epoch)) #save all models
         best_train_loss, best_val_loss, best_train_acc, best_val_acc = \
             save_only_best(epoch, model, optimizer, cfg.models_folder, logger, \
@@ -172,60 +163,6 @@ def save_only_best(epoch, model, optimizer, models_folder, logger,\
         save(epoch, model, optimizer, models_folder ,"best_val_acc")
         best_val_acc = val_acc
     return best_train_loss, best_val_loss, best_train_acc, best_val_acc
-
-def save(epoch, model, optim, folder, name):
-    save_dict = {"model_state_dict": model.state_dict(),
-                "optimizer_state_dict": optim.state_dict(),
-                "epoch": epoch}
-    filename = os.path.join(folder, name+".pth")
-    torch.save(save_dict, filename)
-
-def load(path, model, optimizer, train=True):
-    checkpoint = torch.load(path)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    epoch = checkpoint['epoch']
-
-    if(train):
-        model.train()
-    else:
-        model.eval()
-    
-    return epoch
-
-def resume_training(hydra_folder, model_name):
-    cfg  = yaml.load(open( "%s/.hydra/config.yaml"%hydra_folder, 'r'))
-    cfg["model"]["save_dir"] = cfg["models_folder"]
-    model = ResNet18LSTM(**cfg["model"]).cuda()
-    optimizer = torch.optim.SGD(model.parameters(), **cfg["optim"]) #cfg.lr
-    models_path = "%s/trained_models/%s"%(hydra_folder, model_name)
-    epoch = load(models_path, model, optimizer, train=True)
-    return model, optimizer, epoch
-
-def eval_model(hydra_folder, model_name):
-    #Setup
-    cfg  = yaml.load(open( "%s/.hydra/config.yaml"%hydra_folder, 'r'))
-    cfg["model"]["save_dir"] = cfg["models_folder"]
-    model = ResNet18LSTM(**cfg["model"]).cuda()
-    optimizer = torch.optim.SGD(model.parameters(), **cfg["optim"]) #cfg.lr
-    models_path = "%s/trained_models/%s"%(hydra_folder, model_name)
-    epoch = load(models_path, model, optimizer, train=False)
-    criterion = nn.CrossEntropyLoss()
-    reshape_transform = transforms.Compose([transforms.ToPILImage(),
-                                    transforms.Resize((64, 64)),
-                                    #transforms.Grayscale(),
-                                    transforms.ToTensor()])
-    val_data = SthSthDataset(labels_file = "78-classes_validation.json",
-                             transform = reshape_transform,
-                             base_dir = "./datasets/20bn-sth-sth-v2",
-                             n_frames = 8, #frames to pick from each video
-                             str2id_file= "78-classes_labels.json"
-                             )
-    val_loader = torch.utils.data.DataLoader(val_data, num_workers = 2, batch_size=4 ,shuffle=True)
-
-    val_loss, val_acc = validate(val_loader, model, criterion)
-    print(epoch, val_loss, val_acc)
-
 
 if __name__ == "__main__":
     # hydra_folder = "./outputs/2020-11-13/01-17-46"
