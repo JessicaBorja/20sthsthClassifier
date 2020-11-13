@@ -47,11 +47,12 @@ class ResNet18LSTM(nn.Module):
         cnn_feat_seq = []
         for t in range(x_in.size(1)):
             # Pass each frame through resnet 
-            if(self.pretrained):
-                with torch.no_grad():
-                    x = self.backbone_net(x_in[:, t, :, :, :]) # image t = (batch, channels, w, h)
-            else:
-                x = self.backbone_net(x_in[:, t, :, :, :]) # image t = (batch, channels, w, h)
+            # if(self.pretrained):
+            #     with torch.no_grad():
+            #         x = self.backbone_net(x_in[:, t, :, :, :]) # image t = (batch, channels, w, h)
+            # else:
+            #     
+            x = self.backbone_net(x_in[:, t, :, :, :]) # image t = (batch, channels, w, h)
             x = x.view(x.size(0), -1) # (batch, channels * w * h)
             # FC layers
             x = F.relu(self.fc1(x))
