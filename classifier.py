@@ -28,7 +28,7 @@ class ResNet18LSTM(nn.Module):
                     )
         # input & output will has batch size as 1s dimension. e.g. (batch, time_step, input_size)
         self.fc4 = nn.Linear(rnn_hidden, fc2_hidden)
-        self.fc5 = nn.Linear(fc2_hidden//2, n_classes, bias = True)
+        self.fc5 = nn.Linear(fc2_hidden, n_classes, bias = True)
         self.dropout_rate = dropout_rate
         #self.softmax = nn.Softmax(dim = -1)
         #nn.init.xavier_uniform_(self.fc1.weight)
