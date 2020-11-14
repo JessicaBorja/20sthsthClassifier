@@ -59,10 +59,10 @@ class ResNet18LSTM(nn.Module):
                 x = self.backbone_net(x_in[:, t, :, :, :]) # image t = (batch, channels, w, h)
             x = x.view(x.size(0), -1) # (batch, channels * w * h)
             # FC layers
-            x = self.bn1(self.fc1(x))
+            x = self.fc1(x)
             x = F.relu(x)
             x = F.relu(self.fc2(x))
-            x = F.dropout(x, p=0.2, training=self.training)
+            #x = F.dropout(x, p=0.2, training=self.training)
             x = F.relu(self.fc3(x))
             cnn_feat_seq.append(x)
 
@@ -75,7 +75,7 @@ class ResNet18LSTM(nn.Module):
         del cnn_feat_seq
         # h_n shape = h_c shape = (n_layers, batch, hidden_size) 
         x = F.relu(self.fc4(rnn_out[:, -1, :]))# (batch,128) choose rnn_out at the last time step
-        x = F.dropout(x, p=0.2, training=self.training)
+        #x = F.dropout(x, p=0.2, training=self.training)
         x = F.relu(self.fc5(x)) # (batch,1,n_classes)
         return x
 
