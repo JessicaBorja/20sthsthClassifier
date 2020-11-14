@@ -21,7 +21,7 @@ class ResNet18LSTM(nn.Module):
         self.fc2 = nn.Linear(fc1_hidden, fc2_hidden)
         self.fc3 = nn.Linear(fc2_hidden, fc3_hidden)
         self.lstm =  nn.LSTM(
-                        input_size = fc2_hidden,
+                        input_size = fc3_hidden,
                         hidden_size = rnn_hidden,
                         num_layers = num_layers,
                         batch_first =  True 
