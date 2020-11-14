@@ -74,7 +74,7 @@ def validate(loader, model, criterion):
             loss = criterion(outputs, labels)
             mean_val_loss += (1/(i+1))*(loss.item() - mean_val_loss)
             if i % 200 == 0:    # print every 100 mini-batches
-                print('[mb %5d/%d] mean loss: %.3f, mean accuracy: %.3f' %
+                print('[mb %5d/%d] mean val loss: %.3f, mean val accuracy: %.3f' %
                   (i + 1, n_minibatches, mean_val_loss, correct / total))
     mean_val_accuracy = correct / total
     return mean_val_loss, mean_val_accuracy
