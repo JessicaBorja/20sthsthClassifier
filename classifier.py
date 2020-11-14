@@ -17,7 +17,7 @@ class ResNet18LSTM(nn.Module):
         self.backbone_net = torch.nn.Sequential(*(list(self.get_backbone(backbone,pretrained).children())[:-1])).cuda()
         _output_len =  512 if backbone =="resnet18" or backbone =="resnet30" else 2048
         self.fc1 = nn.Linear(_output_len,fc1_hidden)
-        self.bn1 = nn.BatchNorm1d(fc1_hidden, momentum=0.01)
+        #self.bn1 = nn.BatchNorm1d(fc1_hidden, momentum=0.01)
         self.fc2 = nn.Linear(fc1_hidden, fc2_hidden)
         self.fc3 = nn.Linear(fc2_hidden, fc3_hidden)
         self.lstm =  nn.LSTM(
@@ -59,8 +59,7 @@ class ResNet18LSTM(nn.Module):
                 x = self.backbone_net(x_in[:, t, :, :, :]) # image t = (batch, channels, w, h)
             x = x.view(x.size(0), -1) # (batch, channels * w * h)
             # FC layers
-            x = self.fc1(x)
-            x = F.relu(x)
+            x = F.relu(self.fc1(x))
             x = F.relu(self.fc2(x))
             #x = F.dropout(x, p=0.2, training=self.training)
             x = F.relu(self.fc3(x))
