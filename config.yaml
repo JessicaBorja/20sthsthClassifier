@@ -19,7 +19,7 @@ dataloader:
 #Network
 optim:
   lr: 1e-3
-  weight_decay: 1e-4
+  #weight_decay: 1e-4
 
 model:
   save_dir: ${models_folder}
