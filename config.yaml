@@ -28,6 +28,7 @@ model:
   n_classes: 78
   rnn_hidden: 256
   num_layers: 4
+  dropout_rate: 0.2
 #-- Hydra config --#
 # hydra:
 #   run:
