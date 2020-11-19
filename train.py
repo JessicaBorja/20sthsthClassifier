@@ -29,7 +29,6 @@ def train(loader, model, criterion, optimizer):
         #cuda
         inputs = inputs.cuda()
         labels = labels.cuda()
-        output = model(inputs)
 
         # zero the parameter gradients
         optimizer.zero_grad()

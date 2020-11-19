@@ -8,8 +8,8 @@ from torchvision.models.resnet import resnet18, resnet34, resnet50, resnet101, r
 import os
 
 class ResNet18LSTM(nn.Module):
-    def __init__(self, pretrained, n_classes, rnn_hidden = 254, num_layers = 4, \
-                 fc1_hidden=254, fc2_hidden=512, fc3_hidden=254, dropout_rate = 0.2,
+    def __init__(self, pretrained, n_classes, rnn_hidden = 256, num_layers = 4, \
+                 fc1_hidden=512, fc2_hidden=512, fc3_hidden=256, dropout_rate = 0.2,
                  backbone= "resnet18", save_dir = "./trained_models/"):
         super().__init__()
         self.save_dir = save_dir
@@ -27,8 +27,7 @@ class ResNet18LSTM(nn.Module):
                         batch_first =  True 
                     )
         # input & output will has batch size as 1s dimension. e.g. (batch, time_step, input_size)
-        self.fc4 = nn.Linear(rnn_hidden, fc2_hidden)
-        self.fc5 = nn.Linear(fc2_hidden, n_classes, bias = True)
+        self.fc4 = nn.Linear(rnn_hidden, n_classes, bias = True)
         self.dropout_rate = dropout_rate
         #self.softmax = nn.Softmax(dim = -1)
         #nn.init.xavier_uniform_(self.fc1.weight)
@@ -50,32 +49,25 @@ class ResNet18LSTM(nn.Module):
 
     def forward(self, x_in): #(batch, n_frames, channels, w, h)
         cnn_feat_seq = []
-        for t in range(x_in.size(1)):
-            # Pass each frame through resnet 
-            if(self.pretrained):
-                with torch.no_grad():
-                    x = self.backbone_net(x_in[:, t, :, :, :]) # image t = (batch, channels, w, h)
-            else:
-                x = self.backbone_net(x_in[:, t, :, :, :]) # image t = (batch, channels, w, h)
-            x = x.view(x.size(0), -1) # (batch, channels * w * h)
-            # FC layers
-            x = F.relu(self.fc1(x))
-            x = F.relu(self.fc2(x))
-            #x = F.dropout(x, p=0.2, training=self.training)
-            x = F.relu(self.fc3(x))
-            cnn_feat_seq.append(x)
-
-        cnn_feat_seq = torch.stack(cnn_feat_seq, dim=0) # (n_frames, batch, cnn features)
-        cnn_feat_seq = torch.transpose(cnn_feat_seq,0,1) # (batch, n_frames, cnn features)
-        #batch_size, seq_len = cnn_feat_seq.shape[0:2]
-        #x = torch.flatten(cnn_feat_seq, 1)
+        #for t in range(x_in.size(1)):
+        batch_size, n_frames, channels, w, h = x_in.shape
+        x = torch.reshape(x_in,(batch_size*n_frames, channels, w, h))
+        # Pass each frame through resnet 
+        if(self.pretrained):
+            with torch.no_grad():
+                x = self.backbone_net(x) # image t = (batch*frames, n_features,1,1)
+        else:
+            x = self.backbone_net(x) # image t = (batch*frames, n_features, 1, 1)
+        x = x.view(batch_size, n_frames, -1) # (batch, channels * w * h)
+        # FC layers
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
+        #x = F.dropout(x, p=self.dropout_rate, training=self.training)
         #self.lstm.flatten_parameters()
-        rnn_out, (h_n, h_c) = self.lstm(cnn_feat_seq, None)  # (batch, n_frames, rnn_hidden)
-        del cnn_feat_seq
+        rnn_out, (h_n, h_c) = self.lstm( x, None)  # (batch, n_frames, rnn_hidden)
         # h_n shape = h_c shape = (n_layers, batch, hidden_size) 
-        x = F.relu(self.fc4(rnn_out[:, -1, :]))# (batch,128) choose rnn_out at the last time step
-        #x = F.dropout(x, p=0.2, training=self.training)
-        x = F.relu(self.fc5(x)) # (batch,1,n_classes)
+        x = F.relu(self.fc4(rnn_out[:, -1, :]))# (batch,n_classes) choose rnn_out at the last time step
         return x
 
     def save(self, model_name = "model"):
