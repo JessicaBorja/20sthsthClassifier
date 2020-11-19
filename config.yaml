@@ -23,7 +23,7 @@ optim:
 
 model:
   save_dir: ${models_folder}
-  backbone : "resnet152" #18,50,101,152
+  backbone : "resnet101" #18,50,101,152
   pretrained: True
   n_classes: 78
   rnn_hidden: 256
