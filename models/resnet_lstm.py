@@ -7,7 +7,7 @@ from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 from torchvision.models.resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 import os
 
-class ResNet18LSTM(nn.Module):
+class ResNetLSTM(nn.Module):
     def __init__(self, pretrained, n_classes, rnn_hidden = 256, num_layers = 4, \
                  fc1_hidden=512, fc2_hidden=512, fc3_hidden=256, dropout_rate = 0.2,
                  backbone= "resnet18", save_dir = "./trained_models/"):

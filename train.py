@@ -6,7 +6,8 @@ import torchvision.transforms.functional as TF
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.transforms import Grayscale
-from classifier import ResNet18LSTM
+from models.resnet_lstm import ResNetLSTM
+from models.frame_lstm import FrameLSTM
 import hydra
 import logging
 from omegaconf import DictConfig, OmegaConf
@@ -78,7 +79,7 @@ def validate(loader, model, criterion):
     mean_val_accuracy = correct / total
     return mean_val_loss, mean_val_accuracy
 
-@hydra.main(config_name="config")
+@hydra.main(config_path="./config", config_name="config")
 def main(cfg : DictConfig) -> None:
     print("Running configuration: ", cfg)
     logger = logging.getLogger(__name__)
@@ -97,7 +98,10 @@ def main(cfg : DictConfig) -> None:
     val_loader = torch.utils.data.DataLoader(val_data, **cfg.dataloader)
     #n_classes = train_data.calc_n_classes()
     #Original number of classes: 174, new:78
-    model = ResNet18LSTM(**cfg.model).cuda()
+    if cfg.model_name == "FrameLSTM":
+        model = FrameLSTM(**cfg.model_cfg).cuda()
+    else:
+        model = ResNetLSTM(**cfg.model_cfg).cuda()
     #print(model)
 
     criterion = nn.CrossEntropyLoss()

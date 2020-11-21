@@ -7,7 +7,8 @@ import torchvision.transforms.functional as TF
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.transforms import Grayscale
-from classifier import ResNet18LSTM
+from models.resnet_lstm import ResNetLSTM
+from models.frame_lstm import FrameLSTM
 from omegaconf import DictConfig, OmegaConf
 import os, yaml
 import numpy as np 
@@ -67,7 +68,10 @@ def load(path, model, optimizer, train=True):
 def resume_training(hydra_folder, model_name):
     cfg  = yaml.load(open( "%s/.hydra/config.yaml"%hydra_folder, 'r'))
     cfg["model"]["save_dir"] = cfg["models_folder"]
-    model = ResNet18LSTM(**cfg["model"]).cuda()
+    if(cfg["model_name"] == "FrameLSTM"):
+        model = FrameLSTM(**cfg["model_cfg"]).cuda()
+    else:
+        model = ResNetLSTM(**cfg["model_cfg"]).cuda()
     optimizer = torch.optim.SGD(model.parameters(), **cfg["optim"]) #cfg.lr
     models_path = "%s/trained_models/%s"%(hydra_folder, model_name)
     epoch = load(models_path, model, optimizer, train=True)

@@ -1,0 +1,10 @@
+model_name: FrameLSTM
+img_size: 220 #min 220 because of pooling
+
+model_cfg:
+  save_dir: ${models_folder}
+  backbone : "resnet50" #18,50,101,152
+  n_classes: 78
+  rnn_hidden: 2048
+  num_layers: 3
+  pool_fn: 'L2' #'avg'

@@ -1,0 +1,11 @@
+model_name: ResnetLSTM
+img_size: 64
+
+model_cfg:
+  save_dir: ${models_folder}
+  backbone : "resnet50" #18,50,101,152
+  pretrained: True
+  n_classes: 78
+  rnn_hidden: 256
+  num_layers: 4
+  dropout_rate: 0.2
