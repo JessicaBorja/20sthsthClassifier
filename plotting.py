@@ -1,27 +1,12 @@
 from matplotlib.pyplot import show
-from utils.utils import map_new2orig, id2str, map_orig2new
+from utils.utils import map_new2orig, id2str, map_orig2new, get_class_dist
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np 
 import os
 
-def get_data(labels_file = "78-classes_train.json", str2id_file = "78-classes_labels.json"):
-    labels_dir = "./datasets/20bn-sth-sth-v2/labels/"
-    data_info_path = os.path.abspath(os.path.join(labels_dir, labels_file))
-    data_info_frame = pd.read_json(data_info_path)
-    ids_frame = pd.read_json(os.path.join(labels_dir, str2id_file),\
-                             typ='series')
-    data_info_frame["template"] = data_info_frame["template"].str.replace("[", "")
-    data_info_frame["template"] = data_info_frame["template"].str.replace("]", "")
-    classes = ids_frame[data_info_frame["template"]]
-    unique, counts = np.unique(classes, return_counts=True)
-    old2new = map_orig2new()
-    unique_str = ids_frame[unique]
-    unique_new_ids = [ old2new[i] for i in unique]
-    return unique_str, unique_new_ids, counts, classes
-
 def plot_class_dist(labels_file="78-classes_train.json", fname = "hist", show_fig = False):
-    unique_str, unique_new_ids, counts, classes = get_data(labels_file)
+    unique_str, unique_new_ids, counts, classes = get_class_dist(labels_file)
     plt.figure(figsize=(14,7))
     plt.title('Class distribution',fontsize=14)
     plt.xlabel('Classes', fontsize=14)

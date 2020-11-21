@@ -15,7 +15,7 @@ import os, yaml
 import numpy as np 
 from datasets import SthSthDataset
 import datetime, time
-from utils.utils import load, save, resume_training
+from utils.utils import load, save, resume_training, get_class_dist
 
 def train(loader, model, criterion, optimizer):
     n_minibatches = len(loader)
@@ -79,6 +79,11 @@ def validate(loader, model, criterion):
     mean_val_accuracy = correct / total
     return mean_val_loss, mean_val_accuracy
 
+def balance_data(train_dataset, train_filename):
+    batch_size = 20
+
+    trainloader = torch.utils.data.DataLoader(train_dataset, batch_size = batch_size, shuffle=True, sampler = sampler)
+
 @hydra.main(config_path="./config", config_name="config")
 def main(cfg : DictConfig) -> None:
     print("Running configuration: ", cfg)
@@ -94,7 +99,15 @@ def main(cfg : DictConfig) -> None:
     val_data = SthSthDataset(labels_file = cfg.validation_filename,
                              transform = reshape_transform,
                              **cfg.dataset)
-    train_loader = torch.utils.data.DataLoader(train_data, **cfg.dataloader)
+    #Balance dataset
+    new_ids_counts, str_counts, labels = get_class_dist(cfg.train_filename)
+    num_samples = len(labels) #amount of train data
+    class_weights = [count/num_samples for _, count in new_ids_counts.items()]
+    weights = [class_weights[labels[i]] for i in range(num_samples)]
+    sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, num_samples = num_samples) #78 classes
+    train_loader = torch.utils.data.DataLoader(train_data, sampler = sampler, **cfg.dataloader)
+    #RandomSampler shuffles data and its mutex with shuffle
+
     val_loader = torch.utils.data.DataLoader(val_data, **cfg.dataloader)
     #n_classes = train_data.calc_n_classes()
     #Original number of classes: 174, new:78
@@ -118,7 +131,8 @@ def main(cfg : DictConfig) -> None:
     #Tensorboard log
     writer_name = "./results/{}".format(model_name)
     writer = SummaryWriter(writer_name)
-    
+    if not os.path.exists(cfg.models_folder):
+        os.makedirs(cfg.models_folder)
     #Training loop
     for epoch in range(cfg.n_epochs):
         start_time = time.time()

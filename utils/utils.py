@@ -1,6 +1,7 @@
 
 import torch
 import torch.nn as nn
+from torch.utils import data
 from torchvision import transforms
 import torchvision.models as models
 import torchvision.transforms.functional as TF
@@ -17,6 +18,8 @@ import matplotlib.pyplot as plt
 from datasets import SthSthDataset
 import datetime, time
 import sys
+from hydra.core.hydra_config import HydraConfig
+import hydra
 
 def save_only_best(epoch, model, optimizer, models_folder, logger,\
                     train_loss, best_train_loss, val_loss, best_val_loss,\
@@ -109,3 +112,33 @@ def id2str(id, new2oldDict, id2strDict):
     full_classes_id = new2oldDict[id]
     str_class = id2strDict[full_classes_id]
     return str_class
+
+def get_class_dist(labels_file = "78-classes_train.json", str2id_file = "78-classes_labels.json"):
+    labels_dir = "./datasets/20bn-sth-sth-v2/labels/"
+    if HydraConfig.initialized():
+        labels_dir = os.path.join(hydra.utils.get_original_cwd(), labels_dir)
+        data_info_path = os.path.join(labels_dir, labels_file)
+    else:
+        labels_dir = os.path.join(os.getcwd(), labels_dir)
+        data_info_path = os.path.abspath(os.path.join(labels_dir, labels_file))
+    data_info_frame = pd.read_json(data_info_path)
+    ids_frame = pd.read_json(os.path.join(labels_dir, str2id_file),\
+                             typ='series')
+    data_info_frame["template"] = data_info_frame["template"].str.replace("[", "")
+    data_info_frame["template"] = data_info_frame["template"].str.replace("]", "")
+    #classes present in labels_file (78)
+    classes = ids_frame[data_info_frame["template"]]
+    unique, counts = np.unique(classes, return_counts=True)
+    old2new = map_orig2new()
+    #str: new id
+    classes = ids_frame[unique].replace(old2new)
+    #returns
+    unique_str = ids_frame[unique]
+    unique_new_ids = [ old2new[i] for i in unique]
+    #new_ids: count
+    new_ids_counts = dict(zip(unique_new_ids, counts))
+    #str_count:
+    str_counts = dict(zip(unique_str, counts))
+    #new_ids in order of the dataframe
+    class_labels = list(classes[data_info_frame["template"]])
+    return new_ids_counts, str_counts, class_labels

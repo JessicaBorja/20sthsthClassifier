@@ -15,7 +15,8 @@ dataset:
 dataloader:
   num_workers: 2
   batch_size : 4
-  shuffle: True
+  #shuffle: True #RandomSampler shuffles data and its mutex with shuffle
+  
 #Network
 optim:
   lr: 1e-3
