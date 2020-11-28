@@ -19,15 +19,15 @@ class ResNetLSTM(nn.Module):
         self.fc1 = nn.Linear(_output_len,fc1_hidden)
         #self.bn1 = nn.BatchNorm1d(fc1_hidden, momentum=0.01)
         self.fc2 = nn.Linear(fc1_hidden, fc2_hidden)
-        self.fc3 = nn.Linear(fc2_hidden, fc3_hidden)
         self.lstm =  nn.LSTM(
-                        input_size = fc3_hidden,
+                        input_size = fc2_hidden,
                         hidden_size = rnn_hidden,
                         num_layers = num_layers,
                         batch_first =  True 
                     )
         # input & output will has batch size as 1s dimension. e.g. (batch, time_step, input_size)
-        self.fc4 = nn.Linear(rnn_hidden, n_classes, bias = True)
+        self.fc3 = nn.Linear(rnn_hidden, fc3_hidden)
+        self.fc4 = nn.Linear(fc3_hidden, n_classes, bias = True)
         self.dropout_rate = dropout_rate
         #self.softmax = nn.Softmax(dim = -1)
         #nn.init.xavier_uniform_(self.fc1.weight)
@@ -62,12 +62,12 @@ class ResNetLSTM(nn.Module):
         # FC layers
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x))
         #x = F.dropout(x, p=self.dropout_rate, training=self.training)
         #self.lstm.flatten_parameters()
         rnn_out, (h_n, h_c) = self.lstm( x, None)  # (batch, n_frames, rnn_hidden)
-        # h_n shape = h_c shape = (n_layers, batch, hidden_size) 
-        x = F.relu(self.fc4(rnn_out[:, -1, :]))# (batch,n_classes) choose rnn_out at the last time step
+        # h_n shape = h_c shape = (n_layers, batch, hidden_size)
+        x = F.relu(self.fc3(rnn_out[:, -1, :]))
+        x = self.fc4(x)# (batch,n_classes) choose rnn_out at the last time step
         return x
 
     def save(self, model_name = "model"):
