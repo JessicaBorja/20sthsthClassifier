@@ -1,3 +1,5 @@
+# @package _group_
+
 model_name: ResnetLSTM
 img_size: 64
 

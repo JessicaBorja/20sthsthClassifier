@@ -5,3 +5,4 @@ __pycache__/
 results/
 trained_models/
 figures/
+test_outputs/

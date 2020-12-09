@@ -46,10 +46,11 @@ def train(loader, model, criterion, optimizer):
         correct += (predicted == labels).sum().item()
         
         # print statistics
-        mean_train_loss += (1/(i+1))*(loss.item() - mean_train_loss)
+        mean_train_loss += loss.item()#(1/(i+1))*(loss.item() - mean_train_loss)
         if i % 200 == 0:    # print every 100 mini-batches
             print('[mb %5d/%d] mean loss: %.3f, mean accuracy: %.3f' %
-                  (i + 1, n_minibatches, mean_train_loss, correct / total))
+                  (i + 1, n_minibatches, mean_train_loss/(i+1) , correct / total))
+    mean_train_loss = mean_train_loss/ n_minibatches
     mean_train_accuracy = correct / total
     return mean_train_loss, mean_train_accuracy
 
@@ -57,7 +58,7 @@ def validate(loader, model, criterion):
     n_minibatches = len(loader)
     correct = 0
     total = 0
-    mean_val_loss = 0
+    mean_loss = 0
     model.eval()
     with torch.no_grad():
         for i, data in enumerate(loader, 0):
@@ -72,25 +73,22 @@ def validate(loader, model, criterion):
             correct += (predicted == labels).sum().item()
             #mean loss
             loss = criterion(outputs, labels)
-            mean_val_loss += (1/(i+1))*(loss.item() - mean_val_loss)
+            mean_loss += loss.item()#(1/(i+1))*(loss.item() - mean_val_loss)
             if i % 200 == 0:    # print every 100 mini-batches
                 print('[mb %5d/%d] mean val loss: %.3f, mean val accuracy: %.3f' %
-                  (i + 1, n_minibatches, mean_val_loss, correct / total))
-    mean_val_accuracy = correct / total
-    return mean_val_loss, mean_val_accuracy
+                  (i + 1, n_minibatches, mean_loss/(i+1) , correct / total))
+    mean_loss = mean_loss / n_minibatches
+    mean_accuracy = correct / total
+    return mean_loss, mean_accuracy
 
-def balance_data(train_dataset, train_filename):
-    batch_size = 20
-
-    trainloader = torch.utils.data.DataLoader(train_dataset, batch_size = batch_size, shuffle=True, sampler = sampler)
 
 @hydra.main(config_path="./config", config_name="config")
 def main(cfg : DictConfig) -> None:
     print("Running configuration: ", cfg)
     logger = logging.getLogger(__name__)
-    logger.info("Running configuration: %s", cfg)
+    logger.info("Running configuration: %s", cfg.pretty())
     reshape_transform = transforms.Compose([transforms.ToPILImage(),
-                                    transforms.Resize((cfg.img_size, cfg.img_size)),
+                                    transforms.Resize((cfg.model.img_size, cfg.model.img_size)),
                                     #transforms.Grayscale(),
                                     transforms.ToTensor()])
     train_data = SthSthDataset(labels_file = cfg.train_filename, #"something-something-v2-train_new.json",
@@ -100,21 +98,22 @@ def main(cfg : DictConfig) -> None:
                              transform = reshape_transform,
                              **cfg.dataset)
     #Balance dataset
-    new_ids_counts, str_counts, labels = get_class_dist(cfg.train_filename)
-    num_samples = len(labels) #amount of train data
-    class_weights = [count/num_samples for _, count in new_ids_counts.items()]
-    weights = [class_weights[labels[i]] for i in range(num_samples)]
-    sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, num_samples = num_samples) #78 classes
-    train_loader = torch.utils.data.DataLoader(train_data, sampler = sampler, **cfg.dataloader)
+    # new_ids_counts, str_counts, labels = get_class_dist(cfg.train_filename)
+    # num_samples = len(labels) #amount of train data
+    # class_weights = [count/num_samples for _, count in new_ids_counts.items()]
+    # weights = [class_weights[labels[i]] for i in range(num_samples)]
+    # sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, num_samples = num_samples) #78 classes
+    # train_loader = torch.utils.data.DataLoader(train_data, sampler = sampler, **cfg.dataloader)
     #RandomSampler shuffles data and its mutex with shuffle
-
+    
+    train_loader = torch.utils.data.DataLoader(train_data, shuffle = True, **cfg.dataloader)
     val_loader = torch.utils.data.DataLoader(val_data, **cfg.dataloader)
     #n_classes = train_data.calc_n_classes()
     #Original number of classes: 174, new:78
-    if cfg.model_name == "FrameLSTM":
-        model = FrameLSTM(**cfg.model_cfg).cuda()
+    if cfg.model.model_name == "FrameLSTM":
+        model = FrameLSTM(**cfg.model.model_cfg).cuda()
     else:
-        model = ResNetLSTM(**cfg.model_cfg).cuda()
+        model = ResNetLSTM(**cfg.model.model_cfg).cuda()
     #print(model)
 
     criterion = nn.CrossEntropyLoss()

@@ -4,6 +4,7 @@ train_filename: "78-classes_train.json"
 validation_filename: "78-classes_validation.json"
 models_folder: "./trained_models/"
 exp_name : "20sth_sth_v2" #summary writer name, code appends date and time
+output_dir: "./outputs"
 n_epochs: 30
 
 #data loader
@@ -17,16 +18,17 @@ dataloader:
   batch_size : 4
   #shuffle: True #RandomSampler shuffles data and its mutex with shuffle
   
-#Network
+#Optimizer
 optim:
   lr: 1e-3
   weight_decay: 1e-4
 
 defaults:
   - model: FrameLSTM #ResNetLSTM, FrameLSTM is with "hotspots from video arch."
+  - hydra/job_logging: colorlog
+  - hydra/hydra_logging: colorlog
 
 #-- Hydra config --#
-# hydra:
-#   run:
-#     # Output directory for normal runs
-#     dir: ./outputs/${now:%Y-%m-%d_%H-%M-%S}
+hydra:
+  run:
+    dir: ./${output_dir}/${now:%Y-%m-%d}/${now:%H-%M-%S} # Output directory for normal runs

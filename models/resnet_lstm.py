@@ -16,18 +16,16 @@ class ResNetLSTM(nn.Module):
         self.pretrained = pretrained
         self.backbone_net = torch.nn.Sequential(*(list(self.get_backbone(backbone,pretrained).children())[:-1])).cuda()
         _output_len =  512 if backbone =="resnet18" or backbone =="resnet30" else 2048
-        self.fc1 = nn.Linear(_output_len,fc1_hidden)
-        #self.bn1 = nn.BatchNorm1d(fc1_hidden, momentum=0.01)
-        self.fc2 = nn.Linear(fc1_hidden, fc2_hidden)
+        self.fc1 = nn.Linear(_output_len,512)
         self.lstm =  nn.LSTM(
-                        input_size = fc2_hidden,
+                        input_size = 512,
                         hidden_size = rnn_hidden,
                         num_layers = num_layers,
                         batch_first =  True 
                     )
         # input & output will has batch size as 1s dimension. e.g. (batch, time_step, input_size)
-        self.fc3 = nn.Linear(rnn_hidden, fc3_hidden)
-        self.fc4 = nn.Linear(fc3_hidden, n_classes, bias = True)
+        self.fc2 = nn.Linear(rnn_hidden, 128)
+        self.fc3 = nn.Linear(128, n_classes, bias = True)
         self.dropout_rate = dropout_rate
         #self.softmax = nn.Softmax(dim = -1)
         #nn.init.xavier_uniform_(self.fc1.weight)
@@ -48,7 +46,6 @@ class ResNetLSTM(nn.Module):
             return resnet18(pretrained=pretrained) #default
 
     def forward(self, x_in): #(batch, n_frames, channels, w, h)
-        cnn_feat_seq = []
         #for t in range(x_in.size(1)):
         batch_size, n_frames, channels, w, h = x_in.shape
         x = torch.reshape(x_in,(batch_size*n_frames, channels, w, h))
@@ -61,13 +58,12 @@ class ResNetLSTM(nn.Module):
         x = x.view(batch_size, n_frames, -1) # (batch, channels * w * h)
         # FC layers
         x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        #x = F.dropout(x, p=self.dropout_rate, training=self.training)
-        #self.lstm.flatten_parameters()
+        self.lstm.flatten_parameters()
         rnn_out, (h_n, h_c) = self.lstm( x, None)  # (batch, n_frames, rnn_hidden)
         # h_n shape = h_c shape = (n_layers, batch, hidden_size)
-        x = F.relu(self.fc3(rnn_out[:, -1, :]))
-        x = self.fc4(x)# (batch,n_classes) choose rnn_out at the last time step
+        
+        x = F.relu(self.fc2(rnn_out[:, -1, :]))# (batch,128) choose rnn_out at the last time step
+        x = self.fc3(x) # (batch,1,n_classes)
         return x
 
     def save(self, model_name = "model"):

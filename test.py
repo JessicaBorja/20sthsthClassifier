@@ -4,18 +4,20 @@ from torch.utils import data
 from torchvision import transforms
 import torchvision.transforms.functional as TF
 from torchvision import transforms
-from classifier import ResNet18LSTM
+from models.resnet_lstm import ResNetLSTM
+from models.frame_lstm import FrameLSTM
 from omegaconf import DictConfig, OmegaConf
 import os, yaml
 import numpy as np 
 import pandas as pd
 from datasets import SthSthTestset,SthSthDataset
 from utils.utils import load, map_new2orig, id2str
-import json
-    
+import json, logging
+import hydra
+logger = logging.getLogger(__name__)
+
 #no labels
-def make_predictions(loader, model):
-    base_dir = "./datasets/20bn-sth-sth-v2"
+def make_predictions(loader, model, base_dir):
     small2largeDict = map_new2orig()
     str2idDict = pd.read_json(\
                       os.path.join("%s/labels/"%base_dir, "something-something-v2-labels.json"),\
@@ -36,36 +38,36 @@ def make_predictions(loader, model):
     predictions = dict(zip(filenames, classes))
     return predictions
 
-def test_model(hydra_folder, model_name, output_dir = "./"):
+def test_model(cfg, models_path):
     #Setup
-    cfg  = yaml.load(open( "%s/.hydra/config.yaml"%hydra_folder, 'r'))
-    cfg["model"]["save_dir"] = cfg["models_folder"]
-    model = ResNet18LSTM(**cfg["model"]).cuda()
-    optimizer = torch.optim.SGD(model.parameters(), **cfg["optim"]) #cfg.lr
-    models_path = "%s/trained_models/%s"%(hydra_folder, model_name)
+    model = ResNetLSTM(**cfg.model).cuda()
+    optimizer = torch.optim.SGD(model.parameters(), **cfg.optim) #cfg.lr
+
     epoch = load(models_path, model, optimizer, train=False)
     criterion = nn.CrossEntropyLoss()
     reshape_transform = transforms.Compose([transforms.ToPILImage(),
                                     transforms.Resize((64, 64)),
                                     #transforms.Grayscale(),
                                     transforms.ToTensor()])
+    base_dir = "../../../datasets/20bn-sth-sth-v2"
     data = SthSthTestset(ids_file = "something-something-v2-test.json",
-                         base_dir = "./datasets/20bn-sth-sth-v2",
+                         base_dir = base_dir,
                          transform = reshape_transform,
                          n_frames = 8, #frames to pick from each video
                         )
     data_loader = torch.utils.data.DataLoader(data, num_workers = 2, batch_size=1 ,shuffle=False)
-    predictions = make_predictions(data_loader, model)
+    predictions = make_predictions(data_loader, model, base_dir)
     #write file
-    output_file = "%s/predictions.json"%output_dir
+    output_file = "./predictions.json"
     with open(output_file, 'w') as file:
         file.write(json.dumps(predictions, indent=2))# use `json.loads` to do the reverse
 
 def validation(loader, model, criterion):
     n_minibatches = len(loader)
-    correct = 0
+    top1_acc = 0
+    top5_acc = 0
     total = 0
-    mean_val_loss = 0
+    mean_loss = 0
     model.eval()
     with torch.no_grad():
         for i, data in enumerate(loader, 0):
@@ -75,43 +77,55 @@ def validation(loader, model, criterion):
             labels = labels.cuda()
 
             outputs = model(images)
-            _, predicted = torch.max(outputs.data, 1)
+            #_, predicted = torch.max(outputs.data, dim=-1)
+            _, top_1 = torch.topk(outputs.data, 1, dim=-1) #values, indices 
+            _, top_5 = torch.topk(outputs.data, 5, dim=-1)
             total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+            top1_acc += (top_1.squeeze(-1) == labels).sum().item()
+            top5_acc += top_5.eq(labels.view(-1,1).expand_as(top_5)).sum().item()
             #mean loss
             loss = criterion(outputs, labels)
-            mean_val_loss += (1/(i+1))*(loss.item() - mean_val_loss)
+            mean_loss += loss.item()#(1/(i+1))*(loss.item() - mean_val_loss)
             if i % 200 == 0:    # print every 100 mini-batches
-                print('[mb %5d/%d] mean loss: %.3f, mean accuracy: %.3f' %
-                  (i + 1, n_minibatches, mean_val_loss, correct / total))
-    mean_val_accuracy = correct / total
-    return mean_val_loss, mean_val_accuracy
+                logger.info(
+                  "[mb %5d/%d] mean val loss: %.3f, top1 accuracy: %.3f, top5 accuracy: %.3f"%
+                  (i + 1, n_minibatches, mean_loss/(i+1) , top1_acc / total, top5_acc/total))
+    mean_loss = mean_loss / n_minibatches
+    top1_acc = top1_acc / total
+    top5_acc = top5_acc / total
+    return mean_loss, top1_acc, top5_acc
 
-def eval_model(hydra_folder, model_name):
+def eval_model(cfg, models_path):
     #Setup
-    cfg  = yaml.load(open( "%s/.hydra/config.yaml"%hydra_folder, 'r'))
-    cfg["model"]["save_dir"] = cfg["models_folder"]
-    model = ResNet18LSTM(**cfg["model"],fc1_hidden=512,fc2_hidden=512).cuda()
-    optimizer = torch.optim.SGD(model.parameters(), **cfg["optim"]) #cfg.lr
-    models_path = "%s/trained_models/%s"%(hydra_folder, model_name)
+    model = ResNetLSTM(**cfg.model).cuda()
+    optimizer = torch.optim.SGD(model.parameters(), **cfg.optim)
     epoch = load(models_path, model, optimizer, train=False)
+
     criterion = nn.CrossEntropyLoss()
     reshape_transform = transforms.Compose([transforms.ToPILImage(),
-                                    transforms.Resize((64, 64)),
+                                    transforms.Resize((cfg.img_size, cfg.img_size)),
                                     #transforms.Grayscale(),
                                     transforms.ToTensor()])
+    base_dir = "../../../datasets/20bn-sth-sth-v2"
     val_data = SthSthDataset(labels_file = "78-classes_validation.json",
                              transform = reshape_transform,
-                             base_dir = ".//datasets//20bn-sth-sth-v2",
-                             n_frames = 8, #frames to pick from each video
-                             str2id_file = "78-classes_labels.json")
-    data_loader = torch.utils.data.DataLoader(val_data, num_workers = 2, batch_size=8 ,shuffle=False)
-    mean_val_loss, mean_val_accuracy = validation(data_loader, model, criterion)
-    #write file
-    print("[epoch %d] mean_loss = %.3f, mean_acc = %.3f"%(epoch,mean_val_loss,mean_val_accuracy))
+                             base_dir = base_dir,
+                             n_frames = cfg.dataset.n_frames, #frames to pick from each video
+                             str2id_file = cfg.dataset.str2id_file)
 
-if __name__ == "__main__":
-    hydra_folder = "./outputs/2020-11-13/01-17-46"
+    data_loader = torch.utils.data.DataLoader(val_data, num_workers = 2, batch_size=8 , shuffle=False)
+    mean_loss, top1acc, top5acc = validation(data_loader, model, criterion)
+
+    #write file
+
+@hydra.main(config_path="./config", config_name="config")
+def main(cfg):
+    test_model_dir = "../../../%s/"%cfg.test_dir
+    test_cfg = OmegaConf.load(test_model_dir + ".hydra/config.yaml")
     model_name = "epoch_25.pth"
-    #test_model(hydra_folder, model_name=model_name, output_dir = "./")
-    eval_model(hydra_folder, model_name)
+    models_path = os.path.abspath(os.path.join(test_model_dir + cfg.models_folder, model_name))
+    #test_model(test_cfg, models_path=models_path)
+    eval_model(test_cfg, models_path=models_path)
+    
+if __name__ == "__main__":
+    main()

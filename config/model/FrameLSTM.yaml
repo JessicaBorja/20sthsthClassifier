@@ -1,3 +1,5 @@
+# @package _group_
+
 model_name: FrameLSTM
 img_size: 220 #min 220 because of pooling
 

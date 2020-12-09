@@ -106,7 +106,6 @@ class SthSthTestset(Dataset):
         self.video_ids_frame = pd.read_json(os.path.join(self.labels_dir, ids_file))
         self.transform = transform
         self.n_frames = n_frames if n_frames<=20 else 20
-        self.transform = transform
 
     def __len__(self):
         return len(self.video_ids_frame)

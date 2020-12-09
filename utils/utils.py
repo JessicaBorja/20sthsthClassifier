@@ -53,18 +53,23 @@ def save(epoch, model, optim, folder, name):
 
 def load(path, model, optimizer, train=True):
     epoch = 0
-    try:
-        checkpoint = torch.load(path)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        epoch = checkpoint['epoch']
-        if(train):
-            model.train()
-        else:
-            model.eval()
-        print("load succesful!: %s"%path)
-    except:
-        print("Error in loading: ", sys.exc_info()[0])
+    checkpoint = torch.load(path)
+    model.load_state_dict(checkpoint['model_state_dict'], strict=False) #allows loading from different pytorch versions
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    epoch = checkpoint['epoch']
+    print("load succesful!: %s"%path)
+    # try:
+    #     checkpoint = torch.load(path)
+    #     model.load_state_dict(checkpoint['model_state_dict'], strict=False) #allows loading from different pytorch versions
+    #     optimizer.load_state_dict(checkpoint['optimizer_state_dict'], strict=False)
+    #     epoch = checkpoint['epoch']
+    #     if(train):
+    #         model.train()
+    #     else:
+    #         model.eval()
+    #     print("load succesful!: %s"%path)
+    # except:
+    #     print("Error in loading: ", sys.exc_info()[0])
     
     return epoch
 
