@@ -58,7 +58,7 @@ def train(loader, model, criterion, optimizer):
         batch_time = time.time() - end
         end = time.time()
         if i % 200 == 0:    # print every 100 mini-batches
-            print('[mb %5d/%d]\n batch_time: %.5f, data_time: %.5f,\n mean val loss: %.3f, mean val accuracy: %.3f'%
+            print('[mb %5d/%d]\n batch_time: %.5f, data_time: %.5f,\n mean loss: %.3f, mean accuracy: %.3f'%
                     (i + 1, n_minibatches, batch_time, data_time, mean_loss/(i+1) , correct / total))
 
     mean_loss = mean_loss/ n_minibatches
