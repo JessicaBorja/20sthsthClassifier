@@ -16,6 +16,7 @@ dataset:
 dataloader:
   num_workers: 2
   batch_size : 4 #28
+  pin_memory: True
   #shuffle: True #RandomSampler shuffles data and its mutex with shuffle
   
 #Optimizer

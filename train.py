@@ -20,11 +20,17 @@ from utils.utils import load, save, resume_training, get_class_dist
 def train(loader, model, criterion, optimizer):
     n_minibatches = len(loader)
     model.train()
-    mean_train_loss = 0.0
-    mean_train_accuracy = 0.0
+    mean_loss = 0.0
+    mean_accuracy = 0.0
     correct = 0
     total = 0
+    
+    batch_time, data_time = 0, 0
+    end = time.time()
     for i, data in enumerate(loader, 0):
+        # measure data loading time
+        data_time = time.time() - end
+        
         # get the inputs; data is a list of [inputs, labels]
         inputs, labels = data
         #cuda
@@ -46,13 +52,18 @@ def train(loader, model, criterion, optimizer):
         correct += (predicted == labels).sum().item()
         
         # print statistics
-        mean_train_loss += loss.item()#(1/(i+1))*(loss.item() - mean_train_loss)
+        mean_loss += loss.item()#(1/(i+1))*(loss.item() - mean_train_loss)
+        
+        #Measure batch Time
+        batch_time = time.time() - end
+        end = time.time()
         if i % 200 == 0:    # print every 100 mini-batches
-            print('[mb %5d/%d] mean loss: %.3f, mean accuracy: %.3f' %
-                  (i + 1, n_minibatches, mean_train_loss/(i+1) , correct / total))
-    mean_train_loss = mean_train_loss/ n_minibatches
-    mean_train_accuracy = correct / total
-    return mean_train_loss, mean_train_accuracy
+            print('[mb %5d/%d]\n batch_time: %.5f, data_time: %.5f,\n mean val loss: %.3f, mean val accuracy: %.3f'%
+                    (i + 1, n_minibatches, batch_time, data_time, mean_loss/(i+1) , correct / total))
+
+    mean_loss = mean_loss/ n_minibatches
+    mean_accuracy = correct / total
+    return mean_loss, mean_accuracy
 
 def validate(loader, model, criterion):
     n_minibatches = len(loader)
@@ -61,9 +72,13 @@ def validate(loader, model, criterion):
     mean_loss = 0
     model.eval()
     with torch.no_grad():
+        batch_time, data_time = 0, 0
+        end = time.time()
         for i, data in enumerate(loader, 0):
+            # measure data loading time
+            data_time = time.time() - end
+            
             images, labels = data
-            #cuda
             images = images.cuda()
             labels = labels.cuda()
 
@@ -74,9 +89,13 @@ def validate(loader, model, criterion):
             #mean loss
             loss = criterion(outputs, labels)
             mean_loss += loss.item()#(1/(i+1))*(loss.item() - mean_val_loss)
-            if i % 200 == 0:    # print every 100 mini-batches
-                print('[mb %5d/%d] mean val loss: %.3f, mean val accuracy: %.3f' %
-                  (i + 1, n_minibatches, mean_loss/(i+1) , correct / total))
+                    #Measure batch Time
+            batch_time = time.time() - end
+            end = time.time()
+            if i % 200 == 0:    # print every n mini-batches
+                print('[mb %5d/%d]\n batch_time: %.5f, data_time: %.5f,\n mean val loss: %.3f, mean val accuracy: %.3f'%
+                        (i + 1, n_minibatches, batch_time, data_time, mean_loss/(i+1) , correct / total))
+
     mean_loss = mean_loss / n_minibatches
     mean_accuracy = correct / total
     return mean_loss, mean_accuracy
@@ -114,7 +133,7 @@ def main(cfg : DictConfig) -> None:
         model = FrameLSTM(**cfg.model.model_cfg).cuda()
     else:
         model = ResNetLSTM(**cfg.model.model_cfg).cuda()
-    #print(model)
+    print("cuda status: %s"%str(next(model.parameters()).is_cuda))
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), **cfg.optim) #cfg.lr
