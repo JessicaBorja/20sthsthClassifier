@@ -117,15 +117,18 @@ def main(cfg : DictConfig) -> None:
                              transform = reshape_transform,
                              **cfg.dataset)
     #Balance dataset
-    # new_ids_counts, str_counts, labels = get_class_dist(cfg.train_filename)
-    # num_samples = len(labels) #amount of train data
-    # class_weights = [count/num_samples for _, count in new_ids_counts.items()]
-    # weights = [class_weights[labels[i]] for i in range(num_samples)]
-    # sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, num_samples = num_samples) #78 classes
-    # train_loader = torch.utils.data.DataLoader(train_data, sampler = sampler, **cfg.dataloader)
+    new_ids_counts, str_counts, labels = get_class_dist(cfg.train_filename)
+    num_samples = len(labels) #amount of train data
+    class_weights = [1./count for _, count in new_ids_counts.items()]
+    weights = np.array([class_weights[labels[i]] for i in range(num_samples)])#same classes get same weights
+    weights = torch.from_numpy(weights)
+    weights = weights.double()
+    sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, num_samples = len(weights)) #78 classes
     #RandomSampler shuffles data and its mutex with shuffle
+    train_loader = torch.utils.data.DataLoader(train_data, sampler = sampler, **cfg.dataloader)
     
-    train_loader = torch.utils.data.DataLoader(train_data, shuffle = True, **cfg.dataloader)
+    #RandomSampler shuffles data and its mutex with shuffle
+    #train_loader = torch.utils.data.DataLoader(train_data, shuffle = True, **cfg.dataloader)
     val_loader = torch.utils.data.DataLoader(val_data, **cfg.dataloader)
     #n_classes = train_data.calc_n_classes()
     #Original number of classes: 174, new:78
