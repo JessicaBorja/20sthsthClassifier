@@ -14,7 +14,8 @@ class ResNetLSTM(nn.Module):
         super().__init__()
         self.save_dir = save_dir
         self.pretrained = pretrained
-        self.backbone_net = torch.nn.Sequential(*(list(self.get_backbone(backbone,pretrained).children())[:-1])).cuda()
+        self.backbone_fixed = torch.nn.Sequential(*(list(self.get_backbone(backbone,pretrained).children())[:-3])).cuda()
+        self.backbone_train = torch.nn.Sequential(*(list(self.get_backbone(backbone,pretrained).children())[-3:-1])).cuda()
         _output_len =  512 if backbone =="resnet18" or backbone =="resnet30" else 2048
         self.fc1 = nn.Linear(_output_len,512)
         self.lstm =  nn.LSTM(
@@ -52,9 +53,10 @@ class ResNetLSTM(nn.Module):
         # Pass each frame through resnet 
         if(self.pretrained):
             with torch.no_grad():
-                x = self.backbone_net(x) # image t = (batch*frames, n_features,1,1)
+                x = self.backbone_fixed(x) # image t = (batch*frames, n_features,1,1)
         else:
-            x = self.backbone_net(x) # image t = (batch*frames, n_features, 1, 1)
+            x = self.backbone_fixed(x) # image t = (batch*frames, n_features, 1, 1)
+        x = self.backbone_train(x)
         x = x.view(batch_size, n_frames, -1) # (batch, channels * w * h)
         # FC layers
         x = F.relu(self.fc1(x))
