@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules import rnn
+from torch.nn.modules.dropout import Dropout
 from torchvision.models._utils import IntermediateLayerGetter
 from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 from torchvision.models.resnet import resnet18, resnet34, resnet50, resnet101, resnet152
@@ -14,8 +15,8 @@ class ResNetLSTM(nn.Module):
         super().__init__()
         self.save_dir = save_dir
         self.pretrained = pretrained
-        self.backbone_fixed = torch.nn.Sequential(*(list(self.get_backbone(backbone,pretrained).children())[:-5])).cuda()
-        self.backbone_train = torch.nn.Sequential(*(list(self.get_backbone(backbone,pretrained).children())[-5:-1])).cuda()
+        self.backbone_fixed = torch.nn.Sequential(*(list(self.get_backbone(backbone,pretrained).children())[:-4])).cuda()
+        self.backbone_train = torch.nn.Sequential(*(list(self.get_backbone(backbone,pretrained).children())[-4:-1])).cuda()
         _output_len =  512 if backbone =="resnet18" or backbone =="resnet30" else 2048
         self.fc1 = nn.Linear(_output_len,512)
         self.lstm =  nn.LSTM(
@@ -25,8 +26,8 @@ class ResNetLSTM(nn.Module):
                         batch_first =  True 
                     )
         # input & output will has batch size as 1s dimension. e.g. (batch, time_step, input_size)
-        #self.fc2 = nn.Linear(rnn_hidden, 128)
-        self.fc3 = nn.Linear(rnn_hidden, n_classes, bias = True)
+        self.fc2 = nn.Linear(rnn_hidden, 128)
+        self.fc3 = nn.Linear(128, n_classes, bias = True)
         self.dropout_rate = dropout_rate
         self.dropout = nn.Dropout(dropout_rate)
         #self.softmax = nn.Softmax(dim = -1)
@@ -58,7 +59,7 @@ class ResNetLSTM(nn.Module):
         else:
             x = self.backbone_fixed(x) # image t = (batch*frames, n_features, 1, 1)
         x = self.backbone_train(x)
-        x = self.dropout(x)
+        #x = self.dropout(x)
         x = x.view(batch_size, n_frames, -1) # (batch, channels * w * h)
         # FC layers
         x = F.relu(self.fc1(x))
@@ -66,8 +67,8 @@ class ResNetLSTM(nn.Module):
         rnn_out, (h_n, h_c) = self.lstm( x, None)  # (batch, n_frames, rnn_hidden)
         # h_n shape = h_c shape = (n_layers, batch, hidden_size)
         
-        x = self.fc3(rnn_out[:, -1, :])# (batch,128) choose rnn_out at the last time step
-        #x = self.fc3(x) # (batch,1,n_classes)
+        x = F.relu(self.fc2(rnn_out[:, -1, :]))# (batch,128) choose rnn_out at the last time step
+        x = self.fc3(x) # (batch,1,n_classes)
         return x
 
     def save(self, model_name = "model"):
